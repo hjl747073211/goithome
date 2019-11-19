@@ -4,25 +4,37 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/httplib"
 	"gozh/models"
-	"time"
+	// "time"
+	"net/http"
+	"net/url"
+	"fmt"
 )
 
 type AskController struct {
 	beego.Controller
 }
+type Userinfo struct {
+	Username string
+	Password string
+}
+
+var User Userinfo
+
 
 func (c *AskController) GetAsk() {
 	//链接redis
 	models.ConnectRedis("127.0.0.1:6379")
 
 	//根url
-	sUrl:="http://localhost/test/111.html"
+	// sUrl:="http://localhost/test/111.html"
+	sUrl:="https://www.ithome.com/0/457/806.htm"
 
 	models.PutinQueue(sUrl)
 
-	var m models.Ask
+	
 
 	for{
+		var m models.Ask
 		length:=models.GetQueueLength()
 		if length==0{
 			//如果url队列为空，则退出
@@ -35,8 +47,16 @@ func (c *AskController) GetAsk() {
 			continue
 		}
 
-		rsp:=httplib.Get(sUrl)
+		rsp:=httplib.Get(sUrl).SetProxy(func(request *http.Request) (*url.URL, error) {
+			u := new(url.URL)
+			u.Scheme = "http"
+			u.Host = "10.191.131.21:3128" 
+			u.User = url.UserPassword("F7688609","w98ZavXy")
+			return u, nil
+		})
+
 		sHtml,err:=rsp.String()
+	
 		if err!=nil{
 			panic(err)
 		}
@@ -48,10 +68,12 @@ func (c *AskController) GetAsk() {
 			m.Content  = models.GetAskContent(sHtml)
 			m.TalkUrl = models.GetAskTalk(sHtml)
 
-			_,err:=models.AddAsk(&m)
-			if err!=nil{
-				panic(err)
-			}
+			fmt.Println(m)
+			id,_:=models.AddAsk(&m)
+			fmt.Println(id)
+			// if err!=nil{
+			// 	panic(err)
+			// }
 		}
 		//提取该页面的所有相关链接url
 		urls:=models.GetAskUrl(sHtml)
@@ -67,7 +89,7 @@ func (c *AskController) GetAsk() {
 
 
 		//防止爬取太快被封，休息1秒
-		time.Sleep(time.Second)
+		// time.Sleep(time.Second)
 	}
 
 
